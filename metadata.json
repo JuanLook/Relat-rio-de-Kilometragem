@@ -1,0 +1,6 @@
+{
+  "name": "Controle Corporativo de Quilometragem V1 & UP",
+  "description": "Sistema corporativo responsivo de controle mensal de quilometragem, fechamento semanal para V1 e UP, compartilhamento em equipe e sincronização com Google Sheets e Excel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

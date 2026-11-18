@@ -1,0 +1,439 @@
+{
+  "entities": {
+    "UserSettings": {
+      "title": "UserSettings",
+      "description": "Stores the authenticated user active corporate workspace pointer without PII.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the user.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "activeWorkspaceId": {
+          "type": "string",
+          "description": "ID of the active shared corporate workspace.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": ["userId", "activeWorkspaceId", "createdAt", "updatedAt"]
+    },
+    "Workspace": {
+      "title": "Workspace",
+      "description": "Shared corporate mileage workspace for V1 and UP operations.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Display name of the corporate workspace.",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "UID of the workspace creator.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "inviteCode": {
+          "type": "string",
+          "description": "Secret alphanumeric invite code used for team joining.",
+          "minLength": 8,
+          "maxLength": 32,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "memberIds": {
+          "type": "array",
+          "description": "Bounded list (max 10) of collaborator UIDs for direct document lookup."
+        },
+        "spreadsheetId": {
+          "type": "string",
+          "description": "Linked Google Sheets spreadsheet ID.",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]*$"
+        },
+        "spreadsheetUrl": {
+          "type": "string",
+          "description": "Direct URL to open the linked Google Sheets file in Drive.",
+          "maxLength": 300
+        },
+        "spreadsheetTitle": {
+          "type": "string",
+          "description": "Title of the linked Google Sheets spreadsheet.",
+          "maxLength": 120
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "name",
+        "ownerId",
+        "inviteCode",
+        "memberIds",
+        "spreadsheetId",
+        "spreadsheetUrl",
+        "spreadsheetTitle",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "WorkspaceMember": {
+      "title": "WorkspaceMember",
+      "description": "Authorized collaborator record inside a corporate workspace without PII.",
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "description": "Parent workspace ID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Member Firebase Auth UID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display name of the collaborator.",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "role": {
+          "type": "string",
+          "description": "Collaborator permission tier.",
+          "enum": ["owner", "editor"]
+        },
+        "inviteCodeUsed": {
+          "type": "string",
+          "description": "Invite code presented when joining.",
+          "maxLength": 32,
+          "pattern": "^[a-zA-Z0-9_\\-]*$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "workspaceId",
+        "userId",
+        "displayName",
+        "role",
+        "inviteCodeUsed",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "MonthModule": {
+      "title": "MonthModule",
+      "description": "Independent monthly control module (January through December) for a given year.",
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "description": "Parent workspace ID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "monthId": {
+          "type": "string",
+          "description": "Month identifier formatted as YYYY_MM.",
+          "minLength": 7,
+          "maxLength": 7,
+          "pattern": "^[0-9]{4}_(0[1-9]|1[0-2])$"
+        },
+        "year": {
+          "type": "integer",
+          "description": "Reference year (2020-2100)."
+        },
+        "month": {
+          "type": "integer",
+          "description": "Reference month number (1-12)."
+        },
+        "activeWeekNumber": {
+          "type": "integer",
+          "description": "Currently open week number (1-12)."
+        },
+        "totalWeeks": {
+          "type": "integer",
+          "description": "Total number of weeks created in this month (1-12)."
+        },
+        "createdBy": {
+          "type": "string",
+          "description": "UID of user who initialized the month module.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "workspaceId",
+        "monthId",
+        "year",
+        "month",
+        "activeWeekNumber",
+        "totalWeeks",
+        "createdBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "WeekClosure": {
+      "title": "WeekClosure",
+      "description": "Weekly cycle state, bounded entry ID index, and locked V1/UP mileage totals.",
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "description": "Parent workspace ID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "monthId": {
+          "type": "string",
+          "description": "Parent month ID formatted as YYYY_MM.",
+          "minLength": 7,
+          "maxLength": 7,
+          "pattern": "^[0-9]{4}_(0[1-9]|1[0-2])$"
+        },
+        "weekId": {
+          "type": "string",
+          "description": "Week identifier formatted as W1..W12.",
+          "minLength": 2,
+          "maxLength": 3,
+          "pattern": "^W([1-9]|1[0-2])$"
+        },
+        "weekNumber": {
+          "type": "integer",
+          "description": "Sequential week number within the month (1-12)."
+        },
+        "isLocked": {
+          "type": "boolean",
+          "description": "True when the week has been closed and locked against edits."
+        },
+        "lockedTotalV1": {
+          "type": "number",
+          "description": "Fixed total KM for V1 when the week is closed."
+        },
+        "lockedTotalUP": {
+          "type": "number",
+          "description": "Fixed total KM for UP when the week is closed."
+        },
+        "entryIds": {
+          "type": "array",
+          "description": "Bounded list (max 100) of MileageEntry IDs belonging to this week."
+        },
+        "createdBy": {
+          "type": "string",
+          "description": "UID of creator.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "workspaceId",
+        "monthId",
+        "weekId",
+        "weekNumber",
+        "isLocked",
+        "lockedTotalV1",
+        "lockedTotalUP",
+        "entryIds",
+        "createdBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "MileageEntry": {
+      "title": "MileageEntry",
+      "description": "Individual corporate mileage record for company V1 or UP.",
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "description": "Parent workspace ID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "monthId": {
+          "type": "string",
+          "description": "Parent month ID formatted as YYYY_MM.",
+          "minLength": 7,
+          "maxLength": 7,
+          "pattern": "^[0-9]{4}_(0[1-9]|1[0-2])$"
+        },
+        "weekId": {
+          "type": "string",
+          "description": "Parent week ID formatted as W1..W12.",
+          "minLength": 2,
+          "maxLength": 3,
+          "pattern": "^W([1-9]|1[0-2])$"
+        },
+        "weekNumber": {
+          "type": "integer",
+          "description": "Week number (1-12)."
+        },
+        "company": {
+          "type": "string",
+          "description": "Company selector V1 or UP.",
+          "enum": ["V1", "UP"]
+        },
+        "dateDisplay": {
+          "type": "string",
+          "description": "Formatted date DD/MM/AAAA.",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/[0-9]{4}$"
+        },
+        "dateSortKey": {
+          "type": "string",
+          "description": "Chronological sort key YYYY-MM-DD.",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
+        },
+        "kmStart": {
+          "type": "number",
+          "description": "Initial odometer reading."
+        },
+        "kmEnd": {
+          "type": "number",
+          "description": "Final odometer reading (>= kmStart)."
+        },
+        "kmResult": {
+          "type": "number",
+          "description": "Calculated mileage difference (kmEnd - kmStart)."
+        },
+        "description": {
+          "type": "string",
+          "description": "Service or route description.",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "createdBy": {
+          "type": "string",
+          "description": "UID of the collaborator who logged the trip.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "authorName": {
+          "type": "string",
+          "description": "Display name of the collaborator who logged the trip.",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "workspaceId",
+        "monthId",
+        "weekId",
+        "weekNumber",
+        "company",
+        "dateDisplay",
+        "dateSortKey",
+        "kmStart",
+        "kmEnd",
+        "kmResult",
+        "description",
+        "createdBy",
+        "authorName",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/userSettings/{userId}": {
+      "schema": "UserSettings",
+      "description": "Per-user workspace pointer isolated strictly to the authenticated owner."
+    },
+    "/workspaces/{workspaceId}": {
+      "schema": "Workspace",
+      "description": "Corporate workspace metadata, bounded memberIds index, and linked Google Sheet reference."
+    },
+    "/workspaces/{workspaceId}/members/{memberId}": {
+      "schema": "WorkspaceMember",
+      "description": "Authorized team members of a corporate workspace."
+    },
+    "/workspaces/{workspaceId}/months/{monthId}": {
+      "schema": "MonthModule",
+      "description": "Monthly modules (YYYY_MM) inside a workspace."
+    },
+    "/workspaces/{workspaceId}/months/{monthId}/weeks/{weekId}": {
+      "schema": "WeekClosure",
+      "description": "Weekly closing state, bounded entryIds index, and fixed V1/UP totals for a month."
+    },
+    "/workspaces/{workspaceId}/months/{monthId}/entries/{entryId}": {
+      "schema": "MileageEntry",
+      "description": "Individual V1 and UP mileage records inside a month."
+    }
+  }
+}

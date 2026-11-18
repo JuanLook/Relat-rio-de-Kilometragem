@@ -1,0 +1,654 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Hardened Global Primitives
+    // -------------------------------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidMemberIds(ids) {
+      return ids is list
+        && ids.size() >= 1
+        && ids.size() <= 10
+        && ids[0] is string
+        && ids[0].size() >= 1
+        && ids[0].size() <= 128;
+    }
+
+    function isValidEntryIds(ids) {
+      return ids is list
+        && ids.size() <= 100
+        && (
+          ids.size() == 0
+          || (ids[0] is string && ids[0].size() >= 1 && ids[0].size() <= 128)
+        );
+    }
+
+    function isWorkspaceMember(workspaceId) {
+      return exists(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid));
+    }
+
+    function isWorkspaceOwner(workspaceId) {
+      return exists(/databases/$(database)/documents/workspaces/$(workspaceId))
+        && get(/databases/$(database)/documents/workspaces/$(workspaceId)).data.ownerId == request.auth.uid;
+    }
+
+    function isWeekOpenOrOpeningInBatch(workspaceId, monthId, weekId) {
+      return (
+        exists(/databases/$(database)/documents/workspaces/$(workspaceId)/months/$(monthId)/weeks/$(weekId))
+        && get(/databases/$(database)/documents/workspaces/$(workspaceId)/months/$(monthId)/weeks/$(weekId)).data.isLocked == false
+      ) || (
+        existsAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/months/$(monthId)/weeks/$(weekId))
+        && getAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/months/$(monthId)/weeks/$(weekId)).data.isLocked == false
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // Entity Validation Blueprints (Synchronized with firebase-blueprint.json)
+    // -------------------------------------------------------------------------
+    function isValidUserSettings(data) {
+      return data.keys().hasAll(['userId', 'activeWorkspaceId', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'activeWorkspaceId', 'createdAt', 'updatedAt'])
+        && data.userId is string
+        && data.userId.size() >= 1
+        && data.userId.size() <= 128
+        && data.userId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.activeWorkspaceId is string
+        && data.activeWorkspaceId.size() >= 1
+        && data.activeWorkspaceId.size() <= 128
+        && data.activeWorkspaceId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidWorkspace(data) {
+      return data.keys().hasAll([
+          'name',
+          'ownerId',
+          'inviteCode',
+          'memberIds',
+          'spreadsheetId',
+          'spreadsheetUrl',
+          'spreadsheetTitle',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'name',
+          'ownerId',
+          'inviteCode',
+          'memberIds',
+          'spreadsheetId',
+          'spreadsheetUrl',
+          'spreadsheetTitle',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.name is string
+        && data.name.size() >= 1
+        && data.name.size() <= 80
+        && data.ownerId is string
+        && data.ownerId.size() >= 1
+        && data.ownerId.size() <= 128
+        && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.inviteCode is string
+        && data.inviteCode.size() >= 8
+        && data.inviteCode.size() <= 32
+        && data.inviteCode.matches('^[a-zA-Z0-9_\\-]+$')
+        && isValidMemberIds(data.memberIds)
+        && data.spreadsheetId is string
+        && data.spreadsheetId.size() <= 128
+        && data.spreadsheetId.matches('^[a-zA-Z0-9_\\-]*$')
+        && data.spreadsheetUrl is string
+        && data.spreadsheetUrl.size() <= 300
+        && data.spreadsheetTitle is string
+        && data.spreadsheetTitle.size() <= 120
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidWorkspaceMember(data) {
+      return data.keys().hasAll([
+          'workspaceId',
+          'userId',
+          'displayName',
+          'role',
+          'inviteCodeUsed',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'workspaceId',
+          'userId',
+          'displayName',
+          'role',
+          'inviteCodeUsed',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.workspaceId is string
+        && data.workspaceId.size() >= 1
+        && data.workspaceId.size() <= 128
+        && data.workspaceId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.userId is string
+        && data.userId.size() >= 1
+        && data.userId.size() <= 128
+        && data.userId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.displayName is string
+        && data.displayName.size() >= 1
+        && data.displayName.size() <= 80
+        && (data.role == 'owner' || data.role == 'editor')
+        && data.inviteCodeUsed is string
+        && data.inviteCodeUsed.size() <= 32
+        && data.inviteCodeUsed.matches('^[a-zA-Z0-9_\\-]*$')
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMonthModule(data) {
+      return data.keys().hasAll([
+          'workspaceId',
+          'monthId',
+          'year',
+          'month',
+          'activeWeekNumber',
+          'totalWeeks',
+          'createdBy',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'workspaceId',
+          'monthId',
+          'year',
+          'month',
+          'activeWeekNumber',
+          'totalWeeks',
+          'createdBy',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.workspaceId is string
+        && data.workspaceId.size() >= 1
+        && data.workspaceId.size() <= 128
+        && data.workspaceId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.monthId is string
+        && data.monthId.size() == 7
+        && data.monthId.matches('^[0-9]{4}_(0[1-9]|1[0-2])$')
+        && data.year is int
+        && data.year >= 2020
+        && data.year <= 2100
+        && data.month is int
+        && data.month >= 1
+        && data.month <= 12
+        && data.activeWeekNumber is int
+        && data.activeWeekNumber >= 1
+        && data.activeWeekNumber <= 12
+        && data.totalWeeks is int
+        && data.totalWeeks >= 1
+        && data.totalWeeks <= 12
+        && data.activeWeekNumber <= data.totalWeeks
+        && data.createdBy is string
+        && data.createdBy.size() >= 1
+        && data.createdBy.size() <= 128
+        && data.createdBy.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidWeekClosure(data) {
+      return data.keys().hasAll([
+          'workspaceId',
+          'monthId',
+          'weekId',
+          'weekNumber',
+          'isLocked',
+          'lockedTotalV1',
+          'lockedTotalUP',
+          'entryIds',
+          'createdBy',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'workspaceId',
+          'monthId',
+          'weekId',
+          'weekNumber',
+          'isLocked',
+          'lockedTotalV1',
+          'lockedTotalUP',
+          'entryIds',
+          'createdBy',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.workspaceId is string
+        && data.workspaceId.size() >= 1
+        && data.workspaceId.size() <= 128
+        && data.workspaceId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.monthId is string
+        && data.monthId.size() == 7
+        && data.monthId.matches('^[0-9]{4}_(0[1-9]|1[0-2])$')
+        && data.weekId is string
+        && data.weekId.size() >= 2
+        && data.weekId.size() <= 3
+        && data.weekId.matches('^W([1-9]|1[0-2])$')
+        && data.weekNumber is int
+        && data.weekNumber >= 1
+        && data.weekNumber <= 12
+        && data.isLocked is bool
+        && (data.lockedTotalV1 is int || data.lockedTotalV1 is float)
+        && data.lockedTotalV1 >= 0
+        && data.lockedTotalV1 <= 99999999
+        && (data.lockedTotalUP is int || data.lockedTotalUP is float)
+        && data.lockedTotalUP >= 0
+        && data.lockedTotalUP <= 99999999
+        && isValidEntryIds(data.entryIds)
+        && data.createdBy is string
+        && data.createdBy.size() >= 1
+        && data.createdBy.size() <= 128
+        && data.createdBy.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMileageEntry(data) {
+      return data.keys().hasAll([
+          'workspaceId',
+          'monthId',
+          'weekId',
+          'weekNumber',
+          'company',
+          'dateDisplay',
+          'dateSortKey',
+          'kmStart',
+          'kmEnd',
+          'kmResult',
+          'description',
+          'createdBy',
+          'authorName',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'workspaceId',
+          'monthId',
+          'weekId',
+          'weekNumber',
+          'company',
+          'dateDisplay',
+          'dateSortKey',
+          'kmStart',
+          'kmEnd',
+          'kmResult',
+          'description',
+          'createdBy',
+          'authorName',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.workspaceId is string
+        && data.workspaceId.size() >= 1
+        && data.workspaceId.size() <= 128
+        && data.workspaceId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.monthId is string
+        && data.monthId.size() == 7
+        && data.monthId.matches('^[0-9]{4}_(0[1-9]|1[0-2])$')
+        && data.weekId is string
+        && data.weekId.size() >= 2
+        && data.weekId.size() <= 3
+        && data.weekId.matches('^W([1-9]|1[0-2])$')
+        && data.weekNumber is int
+        && data.weekNumber >= 1
+        && data.weekNumber <= 12
+        && (data.company == 'V1' || data.company == 'UP')
+        && data.dateDisplay is string
+        && data.dateDisplay.size() == 10
+        && data.dateDisplay.matches('^(0[1-9]|[12][0-9]|3[01])/(0[1-9]|1[0-2])/[0-9]{4}$')
+        && data.dateSortKey is string
+        && data.dateSortKey.size() == 10
+        && data.dateSortKey.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$')
+        && (data.kmStart is int || data.kmStart is float)
+        && data.kmStart >= 0
+        && data.kmStart <= 9999999
+        && (data.kmEnd is int || data.kmEnd is float)
+        && data.kmEnd >= data.kmStart
+        && data.kmEnd <= 9999999
+        && (data.kmResult is int || data.kmResult is float)
+        && data.kmResult >= 0
+        && data.kmResult >= (data.kmEnd - data.kmStart) - 0.01
+        && data.kmResult <= (data.kmEnd - data.kmStart) + 0.01
+        && data.description is string
+        && data.description.size() >= 1
+        && data.description.size() <= 240
+        && data.createdBy is string
+        && data.createdBy.size() >= 1
+        && data.createdBy.size() <= 128
+        && data.createdBy.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.authorName is string
+        && data.authorName.size() >= 1
+        && data.authorName.size() <= 80
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // -------------------------------------------------------------------------
+    // Collection Rules (Zero open list queries — all reads via verified get)
+    // -------------------------------------------------------------------------
+
+    match /userSettings/{userId} {
+      allow get: if isVerified() && isValidId(userId) && request.auth.uid == userId;
+
+      allow create: if isVerified()
+        && isValidId(userId)
+        && request.auth.uid == userId
+        && isValidUserSettings(incoming())
+        && incoming().userId == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          exists(/databases/$(database)/documents/workspaces/$(incoming().activeWorkspaceId))
+          || existsAfter(/databases/$(database)/documents/workspaces/$(incoming().activeWorkspaceId))
+        );
+
+      allow update: if isVerified()
+        && isValidId(userId)
+        && isValidUserSettings(incoming())
+        && request.auth.uid == userId
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['activeWorkspaceId', 'updatedAt'])
+        && exists(/databases/$(database)/documents/workspaces/$(incoming().activeWorkspaceId));
+    }
+
+    match /workspaces/{workspaceId} {
+      allow get: if isVerified() && isValidId(workspaceId) && isWorkspaceMember(workspaceId);
+
+      allow create: if isVerified()
+        && isValidId(workspaceId)
+        && isValidWorkspace(incoming())
+        && incoming().ownerId == request.auth.uid
+        && request.auth.uid in incoming().memberIds
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && existsAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid));
+
+      allow update: if isVerified()
+        && isValidId(workspaceId)
+        && isValidWorkspace(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action 1: Any workspace member links or updates the Google Sheets reference
+          (
+            isWorkspaceMember(workspaceId)
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'spreadsheetId',
+              'spreadsheetUrl',
+              'spreadsheetTitle',
+              'updatedAt'
+            ])
+          )
+          // Action 2: Workspace owner renames workspace, rotates invite code, or updates memberIds
+          || (
+            existing().ownerId == request.auth.uid
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'name',
+              'inviteCode',
+              'memberIds',
+              'updatedAt'
+            ])
+          )
+          // Action 3: Collaborator joining atomically appends their UID to memberIds
+          || (
+            (
+              isWorkspaceMember(workspaceId)
+              || existsAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid))
+            )
+            && request.auth.uid in incoming().memberIds
+            && existing().ownerId in incoming().memberIds
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'memberIds',
+              'updatedAt'
+            ])
+          )
+        );
+    }
+
+    match /workspaces/{workspaceId}/members/{memberId} {
+      allow get: if isVerified()
+        && isValidId(workspaceId)
+        && isValidId(memberId)
+        && (request.auth.uid == memberId || isWorkspaceMember(workspaceId));
+
+      allow create: if isVerified()
+        && isValidId(workspaceId)
+        && isValidId(memberId)
+        && request.auth.uid == memberId
+        && isValidWorkspaceMember(incoming())
+        && incoming().workspaceId == workspaceId
+        && incoming().userId == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          // Action 1: Atomic owner creation with workspace
+          (
+            incoming().role == 'owner'
+            && existsAfter(/databases/$(database)/documents/workspaces/$(workspaceId))
+            && getAfter(/databases/$(database)/documents/workspaces/$(workspaceId)).data.ownerId == request.auth.uid
+          )
+          // Action 2: Collaborator (e.g. boss) joining with valid invite code
+          || (
+            incoming().role == 'editor'
+            && exists(/databases/$(database)/documents/workspaces/$(workspaceId))
+            && get(/databases/$(database)/documents/workspaces/$(workspaceId)).data.inviteCode == incoming().inviteCodeUsed
+          )
+        );
+
+      allow update: if isVerified()
+        && isValidId(workspaceId)
+        && isValidId(memberId)
+        && isValidWorkspaceMember(incoming())
+        && incoming().workspaceId == existing().workspaceId
+        && incoming().userId == existing().userId
+        && incoming().role == existing().role
+        && incoming().inviteCodeUsed == existing().inviteCodeUsed
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && request.auth.uid == memberId
+        && isWorkspaceMember(workspaceId)
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt']);
+
+      allow delete: if isVerified()
+        && isValidId(workspaceId)
+        && isValidId(memberId)
+        && existing().role != 'owner'
+        && (request.auth.uid == memberId || isWorkspaceOwner(workspaceId));
+    }
+
+    match /workspaces/{workspaceId}/months/{monthId} {
+      allow get: if isVerified()
+        && isValidId(workspaceId)
+        && isValidId(monthId)
+        && isWorkspaceMember(workspaceId);
+
+      allow create: if isVerified()
+        && isValidId(workspaceId)
+        && isValidId(monthId)
+        && isValidMonthModule(incoming())
+        && incoming().workspaceId == workspaceId
+        && incoming().monthId == monthId
+        && incoming().createdBy == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && isWorkspaceMember(workspaceId);
+
+      allow update: if isVerified()
+        && isValidId(workspaceId)
+        && isValidId(monthId)
+        && isValidMonthModule(incoming())
+        && incoming().workspaceId == existing().workspaceId
+        && incoming().monthId == existing().monthId
+        && incoming().year == existing().year
+        && incoming().month == existing().month
+        && incoming().createdBy == existing().createdBy
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && isWorkspaceMember(workspaceId)
+        && incoming().diff(existing()).affectedKeys().hasOnly(['activeWeekNumber', 'totalWeeks', 'updatedAt']);
+    }
+
+    match /workspaces/{workspaceId}/months/{monthId}/weeks/{weekId} {
+      allow get: if isVerified()
+        && isValidId(workspaceId)
+        && isValidId(monthId)
+        && isValidId(weekId)
+        && isWorkspaceMember(workspaceId);
+
+      allow create: if isVerified()
+        && isValidId(workspaceId)
+        && isValidId(monthId)
+        && isValidId(weekId)
+        && isValidWeekClosure(incoming())
+        && incoming().workspaceId == workspaceId
+        && incoming().monthId == monthId
+        && incoming().weekId == weekId
+        && incoming().createdBy == request.auth.uid
+        && incoming().isLocked == false
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && isWorkspaceMember(workspaceId)
+        && (
+          exists(/databases/$(database)/documents/workspaces/$(workspaceId)/months/$(monthId))
+          || existsAfter(/databases/$(database)/documents/workspaces/$(workspaceId)/months/$(monthId))
+        );
+
+      allow update: if isVerified()
+        && isValidId(workspaceId)
+        && isValidId(monthId)
+        && isValidId(weekId)
+        && isValidWeekClosure(incoming())
+        && incoming().workspaceId == existing().workspaceId
+        && incoming().monthId == existing().monthId
+        && incoming().weekId == existing().weekId
+        && incoming().weekNumber == existing().weekNumber
+        && incoming().createdBy == existing().createdBy
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && isWorkspaceMember(workspaceId)
+        && (
+          // Action 1: Add or remove entryIds while week is open
+          (
+            existing().isLocked == false
+            && incoming().isLocked == false
+            && incoming().lockedTotalV1 == existing().lockedTotalV1
+            && incoming().lockedTotalUP == existing().lockedTotalUP
+            && incoming().diff(existing()).affectedKeys().hasOnly(['entryIds', 'updatedAt'])
+          )
+          // Action 2: Close an open week and lock V1 & UP totals
+          || (
+            existing().isLocked == false
+            && incoming().isLocked == true
+            && incoming().entryIds == existing().entryIds
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'isLocked',
+              'lockedTotalV1',
+              'lockedTotalUP',
+              'updatedAt'
+            ])
+          )
+          // Action 3: Explicitly reopen a locked week for corrections
+          || (
+            existing().isLocked == true
+            && incoming().isLocked == false
+            && incoming().entryIds == existing().entryIds
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'isLocked',
+              'updatedAt'
+            ])
+          )
+        );
+    }
+
+    match /workspaces/{workspaceId}/months/{monthId}/entries/{entryId} {
+      allow get: if isVerified()
+        && isValidId(workspaceId)
+        && isValidId(monthId)
+        && isValidId(entryId)
+        && isWorkspaceMember(workspaceId);
+
+      allow create: if isVerified()
+        && isValidId(workspaceId)
+        && isValidId(monthId)
+        && isValidId(entryId)
+        && isValidMileageEntry(incoming())
+        && incoming().workspaceId == workspaceId
+        && incoming().monthId == monthId
+        && incoming().createdBy == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && isWorkspaceMember(workspaceId)
+        && isWeekOpenOrOpeningInBatch(workspaceId, monthId, incoming().weekId);
+
+      allow update: if isVerified()
+        && isValidId(workspaceId)
+        && isValidId(monthId)
+        && isValidId(entryId)
+        && isValidMileageEntry(incoming())
+        && incoming().workspaceId == existing().workspaceId
+        && incoming().monthId == existing().monthId
+        && incoming().weekId == existing().weekId
+        && incoming().weekNumber == existing().weekNumber
+        && incoming().createdBy == existing().createdBy
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && isWorkspaceMember(workspaceId)
+        && isWeekOpenOrOpeningInBatch(workspaceId, monthId, existing().weekId)
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'company',
+          'dateDisplay',
+          'dateSortKey',
+          'kmStart',
+          'kmEnd',
+          'kmResult',
+          'description',
+          'authorName',
+          'updatedAt'
+        ]);
+
+      allow delete: if isVerified()
+        && isValidId(workspaceId)
+        && isValidId(monthId)
+        && isValidId(entryId)
+        && isWorkspaceMember(workspaceId)
+        && isWeekOpenOrOpeningInBatch(workspaceId, monthId, existing().weekId);
+    }
+  }
+}
