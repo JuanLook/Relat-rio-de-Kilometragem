@@ -137,10 +137,11 @@ export function formatFirebaseAuthError(error: unknown): {
   }
 
   if (code === 'auth/unauthorized-domain') {
+    const currentHost =
+      typeof window !== 'undefined' ? window.location.hostname : 'seu-dominio';
     return {
       code,
-      message:
-        'Este domínio ainda não está autorizado no console do Firebase Authentication (Authorized Domains).',
+      message: `O domínio "${currentHost}" precisa ser autorizado no Firebase Console (Authentication → Settings → Authorized domains) do projeto gen-lang-client-0667816129.`,
       suggestNewTab: false,
     };
   }

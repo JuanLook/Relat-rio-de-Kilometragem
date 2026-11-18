@@ -263,7 +263,11 @@ export const TeamShareModal: React.FC<{
   const [busy, setBusy] = useState(false);
 
   const isOwner = workspace.ownerId === currentUserId;
-  const shareUrl = `${window.location.origin}${window.location.pathname}?painel=${encodeURIComponent(workspace.id)}&convite=${encodeURIComponent(workspace.inviteCode)}`;
+  const isDevOrigin = window.location.origin.startsWith('https://ais-dev-');
+  const publicOrigin = isDevOrigin
+    ? window.location.origin.replace('https://ais-dev-', 'https://ais-pre-')
+    : window.location.origin;
+  const shareUrl = `${publicOrigin}${window.location.pathname}?painel=${encodeURIComponent(workspace.id)}&convite=${encodeURIComponent(workspace.inviteCode)}`;
 
   const handleCopyInviteLink = async () => {
     try {
@@ -300,12 +304,21 @@ export const TeamShareModal: React.FC<{
   return (
     <ModalShell title="Acesso Compartilhado da Equipe (Você + Gestor)" onClose={onClose}>
       <div className="space-y-5">
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           <p className="text-sm text-slate-300 leading-relaxed">
-            Envie o link abaixo para o seu chefe ou colega. Ao abrir e clicar em{' '}
-            <strong className="text-slate-100">Entrar com Google</strong>, ele acessará e utilizará
-            este mesmo painel em tempo real, de forma imediata.
+            Envie o link de convite abaixo para o seu chefe. Ao abrir e clicar em{' '}
+            <strong className="text-slate-100">Entrar com Google</strong> (com qualquer conta Google),
+            ele acessará este mesmo painel em tempo real.
           </p>
+
+          {isDevOrigin && (
+            <div className="bg-amber-950/30 border border-amber-800/70 rounded-lg p-3 text-xs text-amber-200 leading-relaxed">
+              <strong>Atenção antes de enviar:</strong> o endereço público{' '}
+              <code className="font-mono">ais-pre-...</code> só abre (sem erro 404) depois que você
+              publicar ou compartilhar o app clicando no botão <strong>Share / Deploy</strong> no
+              topo do AI Studio.
+            </div>
+          )}
 
           <div className="flex items-center gap-2 pt-1">
             <input

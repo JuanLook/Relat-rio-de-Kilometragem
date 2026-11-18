@@ -24,6 +24,7 @@ import {
   GoogleSheetsSyncModal,
   TeamShareModal,
 } from './components/Modals';
+import { OfflineIndicator, PWAInstallButton } from './components/PWAControls';
 import { QuickEntryForm } from './components/QuickEntryForm';
 import {
   createAndSyncGoogleSpreadsheet,
@@ -598,6 +599,7 @@ export default function App() {
               >
                 Exportar Excel
               </button>
+              <PWAInstallButton variant="nav" />
             </nav>
           ) : (
             <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-400">
@@ -687,6 +689,8 @@ export default function App() {
                   <ExternalLink className="w-3.5 h-3.5 text-blue-400" />
                 </a>
               )}
+
+              <PWAInstallButton variant="card" />
 
               <button
                 type="button"
@@ -938,6 +942,8 @@ export default function App() {
                       Modo Local · Entre com Google no topo para Nuvem &amp; Sheets
                     </span>
                   )}
+
+                  <PWAInstallButton variant="control" />
                 </div>
               </div>
             </section>
@@ -1106,6 +1112,8 @@ export default function App() {
           onClose={() => setShowSheetsModal(false)}
         />
       )}
+
+      <OfflineIndicator />
     </div>
   );
 }
